@@ -1,4 +1,5 @@
 library(rtracklayer)
+library(GenomicRanges)
 
 
 workDir="/Volumes/external.data/MeisterLab/FischleLab_KarthikEswara/ChIP"
@@ -158,3 +159,50 @@ forBed<-result[,c("chr","start","end","interval_id","num_peaks")]
 colnames(forBed)<-c("chrom","chromStart","chromEnd","name","score")
 
 export(forBed,paste0(outDir,"/H3K9me2_EM88-EM90-EM91-EM92only.consensus_peaks.bed"))
+
+
+### final selection
+# all but Trip
+boolPattern<-!grepl("Trip",boolCols)
+boolPattern
+matches1 <- rowSums(consensus[boolCols] == matrix(boolPattern, nrow(consensus), length(boolPattern), byrow=TRUE)) == length(boolPattern)
+# all
+boolPattern<-rep(TRUE, length(boolCols))
+boolPattern
+matches2 <- rowSums(consensus[boolCols] == matrix(boolPattern, nrow(consensus), length(boolPattern), byrow=TRUE)) == length(boolPattern)
+# all but EM91 and Trip
+boolPattern<-!grepl("Trip",boolCols) & !grepl("EM91",boolCols)
+boolPattern
+matches3 <- rowSums(consensus[boolCols] == matrix(boolPattern, nrow(consensus), length(boolPattern), byrow=TRUE)) == length(boolPattern)
+
+result  <-consensus[matches1 | matches2 | matches3, ]
+
+colSums(result[,boolCols])
+
+forBed<-result[,c("chr","start","end","interval_id","num_peaks")]
+colnames(forBed)<-c("chrom","chromStart","chromEnd","name","score")
+
+export(forBed,paste0(outDir,"/H3K9me2_finalSubset.consensus_peaks.bed"))
+write.table(result, paste0(outDir,"/H3K9me2.consensus_peaks.boolean.annotatePeaks.finalSubset.txt"), row.names=F, quote=F, sep="\t")
+
+
+gr<-GRanges(consensus)
+EM88sig<-import(paste0(workDir,"/bigwigLog2fc/EM88_IPlog2fcInput_avr.bigwig"),which=gr,
+               as="Numeric")
+
+gr$meanH3K9me3<-sapply(EM88sig,mean,na.rm=T)
+hist(gr$meanH3K9me3, breaks=100)
+
+grsub<-GRanges(forBed)
+EM88sig<-import(paste0(workDir,"/bigwigLog2fc/EM88_IPlog2fcInput_avr.bigwig"),which=grsub,
+                as="Numeric")
+
+grsub$meanH3K9me3<-sapply(EM88sig,mean,na.rm=T)
+hist(grsub$meanH3K9me3, breaks=100)
+
+grNotSub<-gr[! (gr$interval_id %in% grsub$name)]
+
+EM88sig<-import(paste0(workDir,"/bigwigLog2fc/EM88_IPlog2fcInput_avr.bigwig"),which=grNotSub, as="Numeric")
+
+grNotSub$meanH3K9me3<-sapply(EM88sig,mean,na.rm=T)
+hist(grNotSub$meanH3K9me3, breaks=100)
